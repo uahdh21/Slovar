@@ -202,23 +202,18 @@ def refresh_listbox():
 
 def show_database_info():
     '''показывает информацию о словаре'''
-    selected_index = listbox.curselection()
-    if not selected_index:
+    selected = listbox.curselection()
+    if not selected:
         messagebox.showerror("Ошибка", "Сначала выберите базу данных!")
         return
-    selected_db_path = listbox.get(selected_index)
-    metadata = get_metadata(selected_db_path)
+    selected_index = selected[0]
+    selected_db = listbox.get(selected_index)
+    db_path = recent_db_path.get(selected_db)
+    metadata = get_metadata(db_path)
     if metadata:
         created_at, last_opened_at = metadata
-        db_name = os.path.splitext(os.path.basename(selected_db_path))[0]
-        db_path = selected_db_path
-        info_text = (
-            f"Имя базы данных: {db_name}\n"
-            f"Путь: {db_path}\n"
-            f"Дата создания: {created_at}\n"
-            f"Последнее открытие: {last_opened_at}"
-        )
-        messagebox.showinfo("Информация о базе данных", info_text)
+        db_name = os.path.splitext(os.path.basename(selected_db))[0]
+        display_info(db_name, db_path, created_at, last_opened_at)
     else:
         messagebox.showerror("Ошибка", "Не удалось получить информацию о базе данных.")
 
@@ -229,16 +224,16 @@ def button_delete_database():
         messagebox.showwarning("Ошибка", "Выберите словарь для удаления.")
         return
     selected_index = selected[0]
-    selected_text = listbox.get(selected_index)
-    db_path = recent_db_path.get(selected_text)
+    selected_db = listbox.get(selected_index)
+    db_path = recent_db_path.get(selected_db)
     if not db_path:
         messagebox.showerror("Ошибка", "Не удалось найти путь к выбранному словарю.")
         return
-    confirm = messagebox.askyesno("Подтвердить", f"Вы уверены, что хотите удалить словарь {selected_text}?")
+    confirm = messagebox.askyesno("Подтвердить", f"Вы уверены, что хотите удалить словарь {selected_db}?")
     if confirm:
         try:
             os.remove(db_path)
-            messagebox.showinfo("Успешно", f"Словарь {selected_text} удален.")
+            messagebox.showinfo("Успешно", f"Словарь {selected_db} удален.")
             recent_dbs = load_recent_dbs()
             conn = sqlite3.connect(recent_dbs_sqlite)
             cursor = conn.cursor()
@@ -265,6 +260,27 @@ def show_warning_window(message):
     button_close.pack()
     warning_window.grab_set()
     warning_window.mainloop()
+
+def display_info(db_name, db_path, created_at, last_opened_at):
+    '''окно информации'''
+    info_text = (
+        f"Имя базы данных: {db_name}\n"
+        f"Путь: {db_path}\n"
+        f"Дата создания: {created_at}\n"
+        f"Последнее открытие: {last_opened_at}"
+    )
+    info_window = tk.Toplevel()
+    info_window.title("Информация о словаре")
+    info_window.resizable(False, False)
+    screen_width = info_window.winfo_screenwidth()
+    screen_height = info_window.winfo_screenheight()
+    x = (screen_width - 350) // 2
+    y = (screen_height - 135) // 2
+    info_window.geometry(f"350x135+{x}+{y}")
+    label = tk.Label(info_window, text=info_text, justify="left", anchor="w", padx=10, pady=10, font=("Arial", 12))
+    label.pack(fill="both", expand=True)
+    close_button = tk.Button(info_window, text="ОК", command=info_window.destroy)
+    close_button.pack()
 
 def refresh_listbox_words(db_path, listbox_words):
     '''обновляет список со словами'''
@@ -619,8 +635,8 @@ for db_path, _ in recent_dbs:
         listbox.insert(tk.END, file_name)
 
 #кнопка информация о словаре
-#button_show_info = ttk.Button(main_menu, text="Показать информацию о словаре", command=show_database_info)
-#button_show_info.pack(pady=5)
+button_show_info = ttk.Button(main_menu, text="Показать информацию о словаре", command=show_database_info)
+button_show_info.pack(pady=5)
 
 #кнопка удаления
 button_delete = ttk.Button(main_menu, text="Удалить словарь", command=button_delete_database)
