@@ -1,24 +1,19 @@
-#импорт библиотек
+import os
+import sqlite3
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, ttk
 from tkinter import *
-import sqlite3
-import os
 from pathlib import Path
 import time
 from datetime import datetime
+import random
 
-py_path = Path(__file__).parent #определяет путь к программе на диске
+py_path = Path(__file__).parent
 
 recent_dbs_sqlite = os.path.join(py_path, "recent_dbs.sqlite")
 recent_db_path = {}
 
-def main_menu_close():
-    '''закрывает всю программу'''
-    main_menu.destroy()
-
-def button_create_database():
-    '''кнопка создать словарь'''
+def button_create_db():
     global current_db_path
     folder_path = filedialog.askdirectory(title="Выберите папку, в которой будет хранится ваш словарь")
     if not folder_path:
@@ -41,15 +36,14 @@ def button_create_database():
         conn.commit()
         messagebox.showinfo("Успешно", f"Словарь создан в:\n{file_path}")
         set_creation_time(file_path)
-        save_recent_dbs(file_path)
+        save_recent_db(file_path)
         refresh_listbox()
         current_db_path = file_path
         dictionary_window(file_path)
     except Exception as e:
         messagebox.showerror("Ошибка", f"Не удалось создать словарь:\n{e}")
 
-def button_open_database():
-    '''кнопка открыть существующий словарь'''
+def button_open_db():
     global current_db_path
     file_path = filedialog.askopenfilename(
         filetypes=[("SQLite Database", "*.db")],
@@ -58,15 +52,15 @@ def button_open_database():
     if file_path:
         try:
             update_last_opened_time(file_path)
-            save_recent_dbs(file_path)
+            save_recent_db(file_path)
             current_db_path = file_path
             refresh_listbox()
             dictionary_window(file_path)
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось открыть словарь:\n{e}")
 
-def save_recent_dbs(db_path):
-    '''сохраняет словари в файл'''
+def save_recent_db(db_path):
+    '''сохраняет список словарей'''
     if not db_path:
         return
     conn = sqlite3.connect(recent_dbs_sqlite)
@@ -84,7 +78,7 @@ def save_recent_dbs(db_path):
     refresh_listbox()
 
 def create_metadata_table(db_path):
-    '''информация о создании и открытия словаря'''
+    '''создаёт информацию о создании и открытия словаря'''
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -101,7 +95,6 @@ def create_metadata_table(db_path):
         print(f"Ошибка: {e}")
 
 def set_creation_time(db_path):
-    '''устанавливает дату создания словаря'''
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -116,7 +109,6 @@ def set_creation_time(db_path):
         print(f"Ошибка: {e}")
 
 def update_last_opened_time(db_path):
-    '''обновляет когда был в последний раз открыт словарь'''
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -129,7 +121,6 @@ def update_last_opened_time(db_path):
         print(f"Ошибка: {e}")
 
 def get_metadata(db_path):
-    '''получает метадату'''
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -149,7 +140,7 @@ def get_metadata(db_path):
         print(f"Ошибка: {e}")
         return None
 
-def load_recent_dbs():
+def load_recent_db():
     '''загружает словари в список'''
     valid_dbs = []
     if os.path.exists(recent_dbs_sqlite):
@@ -171,7 +162,7 @@ def load_recent_dbs():
         cursor = conn.cursor()
         for path, timestamp in rows:
             if not os.path.exists(path):
-                cursor.execute("DELETE FROM recent_dbs WHERE path = ?", (path,)) #удаляет недавние базы если их нет
+                cursor.execute("DELETE FROM recent_dbs WHERE path = ?", (path,)) #удаляет словари если их нет
         conn.commit()
         conn.close()
     return valid_dbs
@@ -183,16 +174,16 @@ def open_selected_db(event):
     if selected_db:
         selected_word = selected_db[0]
         selected_text = listbox.get(selected_word)
-        full_path = recent_db_path.get(selected_text) #путь к дата базе на диске
+        full_path = recent_db_path.get(selected_text) #путь к словарю
         if full_path:
-            current_db_path = full_path #запоминает открытую в данный момент базу данных
+            current_db_path = full_path #запоминает открытый в данный момент словарь
             update_last_opened_time(full_path)
             dictionary_window(full_path)
 
 def refresh_listbox():
-    '''перезагружает список'''
+    '''обновляет список'''
     listbox.delete(0, tk.END)
-    recent_dbs = load_recent_dbs()
+    recent_dbs = load_recent_db()
     recent_db_path.clear()
     for db_path, _ in recent_dbs:
         file_name = os.path.splitext(os.path.basename(db_path))[0]
@@ -201,7 +192,6 @@ def refresh_listbox():
         listbox.insert(tk.END, display_text)
 
 def show_database_info():
-    '''показывает информацию о словаре'''
     selected = listbox.curselection()
     if not selected:
         messagebox.showerror("Ошибка", "Сначала выберите базу данных!")
@@ -217,8 +207,7 @@ def show_database_info():
     else:
         messagebox.showerror("Ошибка", "Не удалось получить информацию о базе данных.")
 
-def button_delete_database():
-    '''кнопка удаления словаря'''
+def button_delete_db():
     selected = listbox.curselection()
     if not selected:
         messagebox.showwarning("Ошибка", "Выберите словарь для удаления.")
@@ -234,7 +223,7 @@ def button_delete_database():
         try:
             os.remove(db_path)
             messagebox.showinfo("Успешно", f"Словарь {selected_db} удален.")
-            recent_dbs = load_recent_dbs()
+            recent_dbs = load_recent_db()
             conn = sqlite3.connect(recent_dbs_sqlite)
             cursor = conn.cursor()
             cursor.execute("DELETE FROM recent_dbs WHERE path = ?", (db_path,))
@@ -244,8 +233,7 @@ def button_delete_database():
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось удалить словарь: {e}")
 
-def show_warning_window(message):
-    '''окно предупреждения'''
+def warning_window(message):
     warning_window = tk.Toplevel()
     warning_window.title("Внимание")
     warning_window.resizable(False, False)
@@ -262,7 +250,6 @@ def show_warning_window(message):
     warning_window.mainloop()
 
 def display_info(db_name, db_path, created_at, last_opened_at):
-    '''окно информации'''
     info_text = (
         f"Имя базы данных: {db_name}\n"
         f"Путь: {db_path}\n"
@@ -271,13 +258,13 @@ def display_info(db_name, db_path, created_at, last_opened_at):
     )
     info_window = tk.Toplevel()
     info_window.title("Информация о словаре")
-    info_window.resizable(False, False)
+    info_window.resizable(True, True)
     screen_width = info_window.winfo_screenwidth()
     screen_height = info_window.winfo_screenheight()
     x = (screen_width - 350) // 2
     y = (screen_height - 135) // 2
     info_window.geometry(f"350x135+{x}+{y}")
-    label = tk.Label(info_window, text=info_text, justify="left", anchor="w", padx=10, pady=10, font=("Arial", 12))
+    label = tk.Label(info_window, text=info_text, justify="left", anchor="center", padx=10, pady=10, font=("Arial", 12))
     label.pack(fill="both", expand=True)
     close_button = tk.Button(info_window, text="ОК", command=info_window.destroy)
     close_button.pack()
@@ -311,37 +298,35 @@ def refresh_listbox_translations(db_path, listbox_translations):
         print(f"Ошибка при обновлении списка: {e}")
 
 def dictionary_window(db_path):
-    '''окно словаря'''
-    global current_db_path, listbox_words, listbox_translations
-    global search_var_words, search_var_translations
+    correct_translations = []
+    user_answers = []
+    option_menus = []
+    seconds_elapsed = 0
+    quiz_active = False
+    timer_id = None
+    select_window = None
+    scale = None
+    global current_db_path, listbox_words, listbox_translations, search_var_words, search_var_translations
     current_db_path = db_path #запоминает базу данных
-    main_menu.withdraw()
+    start_window.withdraw()
     dictionary = tk.Toplevel()
     dictionary.title("Словарь")
     screen_width = dictionary.winfo_screenwidth()
     screen_height = dictionary.winfo_screenheight()
-    x = (screen_width - 650) // 2
-    y = (screen_height - 600) // 2
-    dictionary.geometry(f"650x600+{x}+{y}") #размер окна
-    dictionary.resizable(True, True)
-    def return_to_main_menu():
-        '''вернуться в главное меню'''
+    x = (screen_width - 533) // 2
+    y = (screen_height - 680) // 2
+    dictionary.geometry(f"533x680+{x}+{y}") #размер окна
+    dictionary.resizable(False, False)
+    def return_to_start_window():
         dictionary.destroy()
-        main_menu.deiconify()
-    dictionary.protocol("WM_DELETE_WINDOW", return_to_main_menu)
+        start_window.deiconify()
+    dictionary.protocol("WM_DELETE_WINDOW", return_to_start_window)
 
-    dictionary.grid_columnconfigure(0, weight=1)
-    dictionary.grid_columnconfigure(1, weight=1)
-    dictionary.grid_columnconfigure(2, weight=1)
-    dictionary.grid_columnconfigure(3, weight=1)
-    dictionary.grid_columnconfigure(4, weight=1)
-    dictionary.grid_columnconfigure(5, weight=1)
-    dictionary.grid_rowconfigure(3, weight=1)
+    dictionary.grid_rowconfigure(4, weight=1)
 
     def save_word_to_db(db_path, word, translation, part_of_speech):
-        '''сохраняет слово в базу данных'''
         if not word or not translation:
-            show_warning_window("Введите слово и перевод")
+            warning_window("Введите слово и перевод")
             return
         try:
             conn = sqlite3.connect(db_path)
@@ -350,7 +335,7 @@ def dictionary_window(db_path):
             cursor.execute("INSERT INTO words (word, translation, part_of_speech) VALUES (?, ?, ?)", (word, translation, part_of_speech))
             conn.commit()
             conn.close()
-            refresh_local_word_list()
+            refresh_words_list()
             messagebox.showinfo("Успешно", "Слово добавлено в словарь")
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось добавить слово: {e}")
@@ -360,9 +345,8 @@ def dictionary_window(db_path):
     dictionary_title = tk.Label(dictionary, text=f"{dictionary_name} словарь", font=("Arial", 14, "bold"))
     dictionary_title.grid(row=0, column=0, columnspan=6, pady=10)
 
-    #кнопка добавить слово в словарь
-    def add_word_window(db_path):
-        '''окно добавления слова в словарь'''
+    #кнопка добавить слово
+    def add_word(db_path):
         add_window = tk.Toplevel()
         add_window.title("Добавить слово")
         ttk.Label(add_window, text="Введите слово:").pack()
@@ -383,7 +367,7 @@ def dictionary_window(db_path):
             translation = entry_translation.get().strip()
             part_of_speech = part_of_speech_var.get().strip()
             if not word or not translation or not part_of_speech:
-                show_warning_window("Введите слово, перевод или выберите часть речи")
+                warning_window("Введите слово, перевод или выберите часть речи")
                 return
             save_word_to_db(db_path, word, translation, part_of_speech)
             add_window.destroy()
@@ -397,12 +381,11 @@ def dictionary_window(db_path):
         y = (screen_height - 187) // 2
         add_window.geometry(f"217x187+{x}+{y}")
         add_window.protocol("WM_ICONIFY", lambda *args: None)
-        add_window.resizable(False, False)
-    button_add_word = ttk.Button(dictionary, text="Добавить слово", command=lambda: add_word_window(db_path))
+        add_window.resizable(True, True)
+    button_add_word = ttk.Button(dictionary, text="Добавить слово", command=lambda: add_word(db_path))
     button_add_word.grid(row=1, column=0, pady=5, padx=13, ipadx=7, ipady=2, sticky=W)
 
     def button_delete_selected_word():
-        '''кнопка удаления слова'''
         selected_word = listbox_words.curselection()
         selected_translation = listbox_translations.curselection()
         if selected_word:
@@ -426,12 +409,12 @@ def dictionary_window(db_path):
                 cursor.execute("DELETE FROM words WHERE word = ? AND translation = ?", (word_to_delete, translation_to_delete))
                 conn.commit()
                 conn.close()
-                refresh_local_word_list()
+                refresh_words_list()
                 messagebox.showinfo("Успешно", f"Слово '{word_to_delete}' удалено.")
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось удалить слово: {e}")
     button_delete_word = ttk.Button(dictionary, text="Удалить слово", command=button_delete_selected_word)
-    button_delete_word.grid(row=1, column=1, pady=5, padx=25, ipadx=7, ipady=2, sticky=E)
+    button_delete_word.grid(row=1, column=5, pady=5, padx=13, ipadx=7, ipady=2, sticky=E)
 
     def filter_words(event=None):
         '''фильтрует список слов по введенному запросу'''
@@ -456,7 +439,6 @@ def dictionary_window(db_path):
             print(f"Ошибка при фильтрации списка: {e}")
 
     def filter_translations(event=None):
-        '''фильтрует список переводов по введенному запросу'''
         query = search_var_translations.get().strip().lower()
         pos_filter = part_of_speech_var.get().strip().lower()
         listbox_words.delete(0, tk.END)
@@ -477,27 +459,27 @@ def dictionary_window(db_path):
         except Exception as e:
             print(f"Ошибка при фильтрации списка: {e}")
 
-    #поле поиска слова
+    #поле для ввода слова
     search_var_words = tk.StringVar()
     search_entry_words = ttk.Entry(dictionary, textvariable=search_var_words, width=30)
-    search_entry_words.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+    search_entry_words.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
     search_entry_words.bind("<KeyRelease>", filter_words)
+
+    search_var_translations = tk.StringVar()
+    search_entry_translations = ttk.Entry(dictionary, textvariable=search_var_translations, width=30)
+    search_entry_translations.grid(row=2, column=2, columnspan=4, padx=10, pady=5, sticky="ew")
+    search_entry_translations.bind("<KeyRelease>", filter_translations)
 
     part_of_speech_var = tk.StringVar()
     part_of_speech_combobox = ttk.Combobox(dictionary, textvariable=part_of_speech_var, state="readonly")
     part_of_speech_combobox['values'] = ["", "Существительное", "Глагол", "Прилагательное", "Наречие", "Местоимение", "Предлог", "Союз", "Междометие", "Числительное", "Другое"]
     part_of_speech_combobox.set("")
-    part_of_speech_combobox.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
+    part_of_speech_combobox.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
     part_of_speech_combobox.bind("<<ComboboxSelected>>", filter_words)
 
-    search_var_translations = tk.StringVar()
-    search_entry_translations = ttk.Entry(dictionary, textvariable=search_var_translations, width=30)
-    search_entry_translations.grid(row=2, column=2, columnspan=4, padx=10, pady=10, sticky="ew")
-    search_entry_translations.bind("<KeyRelease>", filter_translations)
-
     #список со словами
-    def refresh_local_word_list():
-        '''обновляет список со словами'''
+    def refresh_words_list():
+        '''обновляет список'''
         listbox_words.delete(0, tk.END)
         listbox_translations.delete(0, tk.END)
         try:
@@ -512,8 +494,8 @@ def dictionary_window(db_path):
                 listbox_translations.insert(tk.END, translation)
         except Exception as e:
             print(f"Ошибка при обновлении списка: {e}")
-    def edit_word_window(db_path, listbox_words, listbox_translations):
-        '''редактировать слово из списка по двойному нажатию на него'''
+    def edit_word(db_path, listbox_words, listbox_translations):
+        '''редактировать слово по двойному нажатию на него'''
         selected_word = listbox_words.curselection()
         selected_translation = listbox_translations.curselection()
         if selected_word:
@@ -569,7 +551,7 @@ def dictionary_window(db_path):
                             (new_word, new_translation, new_part_of_speech, word, translation))
                 conn.commit()
                 conn.close()
-                refresh_local_word_list()
+                refresh_words_list()
                 messagebox.showinfo("Успешно", "Слово обновлено")
                 edit_window.destroy()
             except Exception as e:
@@ -585,66 +567,208 @@ def dictionary_window(db_path):
         edit_window.geometry(f"217x187+{x}+{y}")
         edit_window.resizable(False, False)
     listbox_words = tk.Listbox(dictionary, height=10, font=("Arial", 12))
-    listbox_words.grid(row=3, column=0, columnspan=2, padx=8, pady=0, sticky=NSEW)
-    listbox_words.bind("<Double-Button-1>", lambda event: edit_word_window(db_path, listbox_words, listbox_translations))
+    listbox_words.grid(row=4, column=0, columnspan=2, padx=8, pady=0, sticky=NSEW)
+    listbox_words.bind("<Double-Button-1>", lambda event: edit_word(db_path, listbox_words, listbox_translations))
 
     listbox_translations = tk.Listbox(dictionary, height=10, font=("Arial", 12))
-    listbox_translations.grid(row=3, column=2, columnspan=4, padx=8, pady=0, sticky=NSEW)
-    listbox_translations.bind("<Double-Button-1>", lambda event: edit_word_window(db_path, listbox_words, listbox_translations))
+    listbox_translations.grid(row=4, column=2, columnspan=4, padx=8, pady=0, sticky=NSEW)
+    listbox_translations.bind("<Double-Button-1>", lambda event: edit_word(db_path, listbox_words, listbox_translations))
+    
+    def quiz(current_db_path):
+
+        def get_total_words():
+            conn = sqlite3.connect(current_db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='words'")
+                if cursor.fetchone() is None:
+                    return 0
+                cursor.execute("SELECT COUNT(*) FROM words")
+                count = cursor.fetchone()[0]
+                return count
+            except sqlite3.Error as e:
+                print(f"Ошибка базы данных: {e}")
+                return 0
+            finally:
+                conn.close()
+
+        def load_words(n):
+            conn = sqlite3.connect(current_db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT word, translation FROM words")
+            data = cursor.fetchall()
+            conn.close()
+            random.shuffle(data)
+            return data[:n]
+
+        def restart_quiz(quiz_window):
+            quiz_window.destroy()
+            quiz_choose_window.deiconify()
+
+        def update_timer(label, quiz_window):
+            nonlocal seconds_elapsed, timer_id, quiz_active
+            if quiz_active:
+                seconds_elapsed += 1
+                label.config(text=f"Время: {seconds_elapsed} сек")
+                timer_id = quiz_window.after(1000, update_timer, label, quiz_window)
+
+        def open_quiz_window(selected_words):
+            nonlocal correct_translations, user_answers, option_menus
+            nonlocal seconds_elapsed, quiz_active, timer_id
+
+            quiz_window = tk.Toplevel(quiz_choose_window)
+            quiz_window.title("Викторина")
+            frame = tk.Frame(quiz_window)
+            frame.pack(padx=20, pady=20)
+
+            correct_translations = []
+            user_answers = []
+            option_menus = []
+
+            all_translations = [t for _, t in load_words(100)]
+            seconds_elapsed = 0
+            quiz_active = True
+            button_refs = {}
+
+            for i, (word, correct_translation) in enumerate(selected_words):
+                tk.Label(frame, text=f"{i+1}. {word}").grid(row=i, column=0, sticky="w")
+                all_other_translations = [t for t in all_translations if t != correct_translation]
+                options = random.sample(all_other_translations, k=min(2, len(all_other_translations)))
+                options.append(correct_translation)
+                random.shuffle(options)
+                var = tk.StringVar(value="")
+                option_menu = tk.OptionMenu(frame, var, *options)
+                option_menu.grid(row=i, column=1, sticky="ew")
+                correct_translations.append(correct_translation)
+                user_answers.append(var)
+                option_menus.append(option_menu)
+
+            timer_label = tk.Label(frame, text="Время: 0 сек", fg="blue")
+            timer_label.grid(row=len(selected_words), column=0, columnspan=2, pady=(10, 0))
+            timer_id = quiz_window.after(1000, update_timer, timer_label, quiz_window)
+
+            check_button = tk.Button(frame, text="Проверить")
+            check_button.config(command=lambda: check_results(check_button, quiz_window, timer_id, button_refs))
+            check_button.grid(row=len(selected_words)+1, column=0, columnspan=2, pady=10)
+
+            show_answers_button = tk.Button(frame, text="Показать правильные ответы", command=lambda: show_correct_answers(selected_words, user_answers, check_button))
+            show_answers_button.grid(row=len(selected_words)+2, column=0, columnspan=2, pady=(0, 10))
+            show_answers_button.grid_remove() #скрывает до проверки
+            button_refs["show_answers_button"] = show_answers_button
+
+        def check_results(check_button, quiz_window, timer_id, button_refs):
+            nonlocal quiz_active
+            quiz_window.after_cancel(timer_id)
+            quiz_active = False
+            score = 0
+            for correct, var, menu in zip(correct_translations, user_answers, option_menus):
+                chosen = var.get()
+                if chosen == correct:
+                    menu.config(bg='lightgreen')
+                    score += 1
+                else:
+                    menu.config(bg='lightcoral')
+            messagebox.showinfo("Результат", f"Правильных ответов: {score} из {len(correct_translations)}")
+            check_button.config(text="Заново", command=lambda: restart_quiz(quiz_window))
+            button_refs["show_answers_button"].grid()
+
+        def show_correct_answers(selected_words, user_answers, check_button):
+            answers_window = tk.Toplevel()
+            answers_window.title("Правильные ответы")
+            tk.Label(answers_window, text="Слово", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=10, pady=5)
+            tk.Label(answers_window, text="Правильный перевод", font=("Arial", 10, "bold")).grid(row=0, column=1, padx=10)
+            tk.Label(answers_window, text="Ваш ответ", font=("Arial", 10, "bold")).grid(row=0, column=2, padx=10)
+
+            for i, ((word, correct), var) in enumerate(zip(selected_words, user_answers)):
+                chosen = var.get()
+                result = "✅" if chosen == correct else "❌"
+                tk.Label(answers_window, text=word).grid(row=i+1, column=0, padx=10, sticky="w")
+                tk.Label(answers_window, text=correct).grid(row=i+1, column=1, padx=10, sticky="w")
+                tk.Label(answers_window, text=f"{chosen} {result}").grid(row=i+1, column=2, padx=10, sticky="w")
+
+        def on_start():
+            n = scale.get()
+            selected = load_words(n)
+            if len(selected) < 1:
+                messagebox.showerror("Ошибка", "Недостаточно слов в словаре.")
+                return
+            if len(selected) < 3:
+                messagebox.showwarning("Внимание", f"В словаре всего {len(selected)} слов. Варианты ответов будут ограничены.")
+            quiz_choose_window.withdraw()
+            open_quiz_window(selected)
+        quiz_choose_window = tk.Toplevel()
+        quiz_choose_window.title("Выбор количества слов")
+        total_words = get_total_words()
+        if total_words == 0:
+            messagebox.showerror("Ошибка", "В словаре нет слов.")
+            quiz_choose_window.destroy()
+            return
+        frame = tk.Frame(quiz_choose_window)
+        frame.pack(pady=20, padx=20)
+        tk.Label(frame, text="Выберите количество слов:").pack()
+        scale = tk.Scale(frame, from_=1, to=total_words, orient=tk.HORIZONTAL, length=300)
+        scale.set(min(10, total_words))
+        scale.pack()
+        btn_frame = tk.Frame(frame)
+        btn_frame.pack(pady=10)
+        tk.Button(btn_frame, text="Начать", command=on_start).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Выйти", command=quiz_choose_window.destroy).pack(side=tk.LEFT, padx=5)
+
+        correct_translations = []
+        user_answers = []
+        option_menus = []
+        seconds_elapsed = 0
+        quiz_active = False
+        timer_id = None
+
+    button_start_exercise = ttk.Button(dictionary, text="Запоминать слова", command=lambda: quiz(current_db_path))
+    button_start_exercise.grid(row=5, column=0, pady=10, ipadx=30, ipady=2, columnspan=6)
 
     #кнопка назад в меню
-    button_back = ttk.Button(dictionary, text="Назад в меню", command=return_to_main_menu)
-    button_back.grid(row=4, column=0, pady=10, ipadx=30, ipady=2, columnspan=6)
+    button_back = ttk.Button(dictionary, text="Назад в меню", command=return_to_start_window)
+    button_back.grid(row=6, column=0, pady=10, ipadx=30, ipady=2, columnspan=6)
 
-    refresh_local_word_list()
+    refresh_words_list()
     dictionary.mainloop()
 
-#главное меню
-main_menu = tk.Tk()
-main_menu.title("Словари")
-main_menu.protocol("WM_DELETE_WINDOW", main_menu_close)
-#определяется размер монитора, для появления окна в центре экрана
-screen_width = main_menu.winfo_screenwidth()
-screen_height = main_menu.winfo_screenheight()
+start_window = tk.Tk()
+start_window.title("Словари")
+start_window.protocol("WM_DELETE_WINDOW", start_window.destroy)
+screen_width = start_window.winfo_screenwidth()
+screen_height = start_window.winfo_screenheight()
 x = (screen_width - 385) // 2
 y = (screen_height - 465) // 2
-main_menu.geometry(f"385x465+{x}+{y}") #размер окна
-main_menu.resizable(False, False)
+start_window.geometry(f"385x465+{x}+{y}") #размер окна
+start_window.resizable(False, False)
 
-#текст
 label = ttk.Label(text="Словарь иностранных слов", font=("Arial", 17))
 label.pack()
 
-#кнопка открыть словарь
-button_open = ttk.Button(main_menu, text="Открыть существующий словарь", command=button_open_database)
+button_open = ttk.Button(start_window, text="Открыть существующий словарь", command=button_open_db)
 button_open.pack(pady=5, anchor=N)
 
-#кнопка создать словарь
-button_create = ttk.Button(main_menu, text="Создать словарь", command=button_create_database)
+button_create = ttk.Button(start_window, text="Создать словарь", command=button_create_db)
 button_create.pack(pady=2)
 
 #список с недавно открытыми или созданными словарями
-listbox = tk.Listbox(main_menu, font=("Arial", 13))
+listbox = tk.Listbox(start_window, font=("Arial", 13))
 listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 listbox.bind("<Double-Button-1>", open_selected_db)
 #загружает словари в список
-recent_dbs = load_recent_dbs()
+recent_dbs = load_recent_db()
 for db_path, _ in recent_dbs:
         file_name = os.path.splitext(os.path.basename(db_path))[0]
         recent_db_path[file_name] = db_path
         listbox.insert(tk.END, file_name)
 
-#кнопка информация о словаре
-button_show_info = ttk.Button(main_menu, text="Показать информацию о словаре", command=show_database_info)
+button_show_info = ttk.Button(start_window, text="Показать информацию о словаре", command=show_database_info)
 button_show_info.pack(pady=5)
 
-#кнопка удаления
-button_delete = ttk.Button(main_menu, text="Удалить словарь", command=button_delete_database)
+button_delete = ttk.Button(start_window, text="Удалить словарь", command=button_delete_db)
 button_delete.pack(pady=5)
 
-#кнопка закрыть программу
-button_programmclose = ttk.Button(main_menu, text="Выйти из программы", command=main_menu_close)
+button_programmclose = ttk.Button(start_window, text="Выйти из программы", command=start_window.destroy)
 button_programmclose.pack(anchor=S, expand=True, pady=10)
 
-main_menu.update_idletasks()
-main_menu.mainloop()
+start_window.update_idletasks()
+start_window.mainloop()
